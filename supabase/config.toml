@@ -1,0 +1,17 @@
+# Cấu hình Supabase CLI. Chỉ cần khi triển khai bằng `supabase functions deploy` / `supabase db push`.
+project_id = "lyly-food"
+
+[auth]
+enable_signup = false              # không cho người lạ tự đăng ký; tài khoản do quản lý tạo
+[auth.email]
+enable_confirmations = false
+double_confirm_changes = false
+[auth.password]
+min_length = 6
+
+[functions.staff-admin]
+# Hàm tự xác thực token và kiểm tra quyền quản lý bên trong (an toàn với cả khoá JWT cũ và mới)
+verify_jwt = false
+
+[functions.parse-orders]
+verify_jwt = false

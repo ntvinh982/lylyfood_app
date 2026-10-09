@@ -1,0 +1,12 @@
+import * as H from './harness.mjs';
+const { data, resetData, mkStaff, ok, finish, sleep } = H;
+resetData({ data: { staff: { A1: mkStaff('Quản lý', 'admin', 'admin') }, menu: {}, groups: {}, customers: {}, orders: {}, settings: {} }, passwords: { admin: 'bep5555' } });
+const errs = [];
+const r = await H.openApp();
+r.w.addEventListener('error', e => errs.push(e.message));
+console.log('login screen:', r.d.body.textContent.slice(0, 200).replace(/\s+/g, ' '));
+await H.loginAs(r.w, r.d, 'admin', 'bep5555', 800);
+console.log('after login:', r.d.body.textContent.slice(0, 300).replace(/\s+/g, ' '));
+console.log('tabs', H.tabs(r.d), errs);
+ok(true, 'smoke');
+finish();
