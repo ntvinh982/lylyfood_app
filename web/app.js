@@ -212,7 +212,8 @@ function fail(e){
   else if(c==='42501') toast(m);                       // thông báo tiếng Việt từ trigger trong DB
   else if(c==='same_password') toast('Mật khẩu mới phải khác mật khẩu cũ.');
   else if(/Failed to fetch|NetworkError|network|Load failed/i.test(m)) toast('Mất kết nối mạng, anh thử lại nhé.');
-  else toast('Chưa lưu được, anh thử lại nhé.');
+  else if(c==='PGRST301'||c==='PGRST303'||e&&e.status===401||/JWT|token.*expired|not authenticated/i.test(m)) toast('Phiên đăng nhập đã hết hạn. Anh tải lại trang (F5) rồi đăng nhập lại nhé.');
+  else toast('Chưa lưu được'+(c||m?' ('+[c,m.slice(0,90)].filter(Boolean).join(': ')+')':'')+'. Anh thử lại nhé.');   // kèm mã lỗi để dễ tìm nguyên nhân
   console.error(e);
 }
 async function fnCall(name,body){
