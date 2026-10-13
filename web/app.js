@@ -91,7 +91,7 @@ const visibleOrders=()=>restricted()?S.orders.filter(o=>o.mode!=='lay'&&o.shippe
 // Mỗi thao tác trên giao diện ứng với đúng một quyền. Thao tác không có trong bảng này bị từ chối.
 const ACT_PERM={
   nav:null,logout:null,filter:null,copy:null,close:null,'change-pw':null,'save-pw':null,theme:null,'sub-back':null,
-  qty:null,gtab:null,seg:null,time:null,pick:null,unpick:null,
+  qty:null,gtab:null,seg:null,time:null,pick:null,unpick:null,clearcust:null,
   day:'order.all',today:'order.all',
   layout:'order.assign','ship-filter':'order.assign','sel-unassigned':'order.assign','sel-all':'order.assign','sel-clear':'order.assign','bulk-assign':'order.assign',
   'new-order':'order.create','order-for':'order.create','save-order':'*order',
@@ -666,7 +666,7 @@ function orderForm(o,presetCust){
   const by=o&&o.createdBy?`Tạo bởi ${esc(o.createdBy)}${o.createdAt?' lúc '+new Date(o.createdAt).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'})+' '+ddm(dstr(new Date(o.createdAt))):''}`:'';
   openSheet(`${head(o?'Sửa đơn':'Tạo đơn mới',by)}
   <div class="sh-body">
-    <section class="fs"><h4>Khách hàng</h4>
+    <section class="fs"><div class="fs-head"><h4>Khách hàng</h4><button type="button" class="linkbtn" id="clearCust" data-act="clearcust" hidden>Xóa hết</button></div>
       <div id="picked"></div>
       <div class="namerow">
         <div class="field"><label for="f_name">Tên khách</label><input type="text" id="f_name" autocomplete="off" value="${esc(F.name)}" placeholder="Gõ tên để tìm khách cũ"></div>
@@ -717,6 +717,13 @@ function updPicked(){
   const c=F.customerId&&S.customers.find(x=>x.id===F.customerId);
   p.innerHTML=c?`<div class="picked"><span>Khách cũ: ${esc(c.name)}</span><button class="sbtn" data-act="unpick">Đổi khách</button></div>`:'';
   $('#saveCustWrap').hidden=!!c;
+  updClear();
+}
+// Nút “Xóa hết”: hiện khi form khách có gì đó để xóa (tên, SĐT, địa chỉ hoặc khách cũ đã chọn)
+function updClear(){
+  const b=$('#clearCust'); if(!b||!F) return;
+  const v=id=>(($(id)||{}).value||'').trim();
+  b.hidden=!(F.customerId||v('#f_name')||v('#f_phone')||v('#f_addr'));
 }
 function updSugg(){
   const box=$('#sugg'); if(!box)return;
@@ -1540,6 +1547,7 @@ document.addEventListener('click',async e=>{
     case 'seg': F[el.dataset.k]=el.dataset.v; el.parentElement.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b===el)); if(el.dataset.k==='mode'){const w=$('#shipWrap'); if(w) w.hidden=F.mode==='lay'} break;
     case 'time': $('#f_time').value=el.dataset.v; break;
     case 'pick': {const c=S.customers.find(x=>x.id===id); if(!c)return; F.customerId=c.id; $('#f_name').value=F.name=c.name||''; $('#f_phone').value=F.phone=c.phone||''; $('#f_addr').value=F.address=c.address||''; updPicked(); updSugg(); break}
+    case 'clearcust': F.customerId=''; $('#f_name').value=$('#f_phone').value=$('#f_addr').value=''; F.name=F.phone=F.address=''; {const sc=$('#f_savecust'); if(sc) sc.checked=true} updPicked(); updSugg(); $('#f_name').focus(); break;
     case 'unpick': F.customerId=''; $('#f_name').value=$('#f_phone').value=$('#f_addr').value=''; F.name=F.phone=F.address=''; updPicked(); updSugg(); $('#f_name').focus(); break;
     case 'save-order': saveOrder(el); break;
     case 'new-cust': custForm(null); break;
@@ -1598,6 +1606,7 @@ document.addEventListener('input',e=>{
   if(!F)return;
   if(t.classList.contains('inote')){const it=F.itemMap[t.dataset.mid]; if(it) it.note=t.value; return}
   if(t.id==='f_name'||t.id==='f_phone'){F.name=$('#f_name').value;F.phone=$('#f_phone').value;updSugg()}
+  if(t.id==='f_name'||t.id==='f_phone'||t.id==='f_addr') updClear();
 });
 document.addEventListener('change',e=>{
   const t=e.target;

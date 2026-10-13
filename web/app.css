@@ -396,3 +396,7 @@ input[type=time]::-webkit-date-and-time-value,input[type=date]::-webkit-date-and
 .cm-ign{font-size:.84rem;color:var(--muted)}
 .cm-ign summary{cursor:pointer;font-weight:700}
 .cm-ign ul{margin:6px 0 0;padding-left:18px}
+
+/* Tiêu đề khối khách + nút xóa hết */
+.fs-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.fs-head .linkbtn{padding:0 4px;min-height:28px;color:var(--due)}
