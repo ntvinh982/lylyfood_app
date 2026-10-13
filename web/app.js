@@ -285,7 +285,7 @@ function stopData(){
 }
 // Đăng xuất / bị khoá: dọn dữ liệu và quay về màn hình đăng nhập
 function leave(msg){
-  S.me=null;S.authId=null;S.loginMsg=msg||'';S.sub=null;S.sel&&S.sel.clear();
+  S.me=null;S.authId=null;S.loginMsg=msg||'';S.sub=null;S.sel&&S.sel.clear();S._autoDay=false;S._dayTouched=false;
   stopData(); closeSheet(); authMode=null;
   if(sb) sb.auth.signOut().catch(()=>{});
   render();
@@ -296,8 +296,23 @@ function afterData(){
     if(fresh&&fresh.active!==false) S.me=fresh;
     else if(S.loaded.staff){ leave(S.me?'Tài khoản đã bị khoá hoặc xoá.':'Tài khoản này đã bị khoá hoặc chưa được cấp quyền.'); return }
   }
+  autoDay();
   render();
 }
+// Mở app sau giờ chốt (Cài đặt → Thông tin cửa hàng) thì danh sách đơn tự chuyển sang ngày mai.
+// Chỉ làm 1 lần mỗi lần mở app, và không đè lên ngày người dùng đã tự chọn.
+function autoDay(){
+  if(S._autoDay||!S.me||!S.loaded.settings||!S.loaded.staff) return;
+  S._autoDay=true;
+  if(restricted()||S._dayTouched) return;                       // shipper chỉ xem hôm nay
+  const n=new Date(), hm=pad(n.getHours())+':'+pad(n.getMinutes());
+  if(S.date===dstr(n)&&hm>=(shop().cutoff||'17:00')){S.date=tomorrowStr();S.sel.clear();subOrders()}
+}
+// Để máy/tab nằm im lâu (≥30 phút) rồi mở lại = coi như mở app mới
+(function(){let hid=0; document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){hid=Date.now();return}
+  if(hid&&Date.now()-hid>=30*60000&&S.me){hid=0;S._autoDay=false;S._dayTouched=false;const t=dstr(new Date()); if(S.date<t){S.date=t;S.sel.clear();subOrders()} autoDay();render()}
+})})();
 // Tải file về máy (hoạt động trên mọi trình duyệt, không cần Claude)
 function saveFile(name,data,mime){
   const url=URL.createObjectURL(new Blob([data],{type:mime||'application/octet-stream'}));
@@ -1543,8 +1558,8 @@ document.addEventListener('click',async e=>{
       const done=await assignShipper(ids,v==='__none'?'':v);
       if(done) S.sel.clear(); else el.disabled=false;
       render(); break}
-    case 'day': {const d=dparse(S.date); d.setDate(d.getDate()+(+el.dataset.d)); S.date=dstr(d); S.sel.clear(); subOrders(); render(); break}
-    case 'today': S.date=dstr(new Date()); S.sel.clear(); subOrders(); render(); break;
+    case 'day': {S._dayTouched=true; const d=dparse(S.date); d.setDate(d.getDate()+(+el.dataset.d)); S.date=dstr(d); S.sel.clear(); subOrders(); render(); break}
+    case 'today': S._dayTouched=true; S.date=dstr(new Date()); S.sel.clear(); subOrders(); render(); break;
     case 'new-order': orderForm(null); break;
     case 'cmt-open': cmtOpen(); break;
     case 'cmt-read': cmtRead(el); break;
@@ -1647,7 +1662,7 @@ document.addEventListener('change',e=>{
   if(t.id==='imp_file'){ if(!can('cust.import')) return; const f=t.files&&t.files[0]; try{t.value=''}catch(_){} if(f) impFile(f); return}
   if(t.id==='imp_hdr'){ if(!can('cust.import')||!IMP)return; IMP.header=t.checked; if(t.checked){const d=detectHeader(IMP.rows); if(d.hits) IMP.map=d.m} renderImp(); return}
   if(t.dataset&&t.dataset.impMap){ if(!can('cust.import')||!IMP)return; IMP.map[t.dataset.impMap]=+t.value; renderImp(); return}
-  if(t.id==='datePick'&&t.value){S.date=t.value;S.sel.clear();subOrders();render()}
+  if(t.id==='datePick'&&t.value){S._dayTouched=true;S.date=t.value;S.sel.clear();subOrders();render()}
   if(t.dataset&&t.dataset.sel!==undefined){ if(!canAssign())return; if(t.checked) S.sel.add(t.dataset.sel); else S.sel.delete(t.dataset.sel); render(); return}
   if(t.dataset&&t.dataset.shipFor){ if(!canAssign())return; assignShipper([t.dataset.shipFor],t.value); return}
   if(t.id==='bulkShip'){ if(!canAssign())return; S.bulkShip=t.value; render(); return}
