@@ -95,7 +95,7 @@ const ACT_PERM={
   day:'order.all',today:'order.all',
   layout:'order.assign','ship-filter':'order.assign','sel-unassigned':'order.assign','sel-all':'order.assign','sel-clear':'order.assign','bulk-assign':'order.assign',
   'new-order':'order.create','order-for':'order.create','save-order':'*order',
-  'cmt-open':'order.create','cmt-read':'order.create','cmt-save':'order.create','cmt-back':'order.create','cmt-rmimg':'order.create','cmt-mode':'order.create','cmt-qty':'order.create','cmt-rmitem':'order.create','cmt-additem':'order.create',
+  'cmt-open':'order.create','cmt-read':'order.create','cmt-save':'order.create','cmt-back':'order.create','cmt-rmimg':'order.create','cmt-mode':'order.create','cmt-pick':'order.create','cmt-qty':'order.create','cmt-rmitem':'order.create','cmt-additem':'order.create',
   'edit-order':'order.edit',pay:'order.pay',deliver:'order.pay',
   'print-one':'order.print','print-all':'order.print','save-bill':'order.print','print-now':'order.print',
   'open-order':'report.view',preset:'report.view',topby:'report.view',
@@ -782,6 +782,12 @@ function cmMatches(d){
   if(ph.length>=9){const m=S.customers.filter(c=>digits(c.phone)===ph); if(m.length) return m}
   return nm?S.customers.filter(c=>norm(c.name).trim()===nm):[];
 }
+// Danh sách khách cũ để chọn: trùng SĐT hoặc trùng tên (để đổi tên sang khách khác vẫn thấy được khách đó)
+function cmChoices(d){
+  const ph=digits(d.phone), nm=norm(d.name).trim(), out=[];
+  for(const c of S.customers) if((ph.length>=9&&digits(c.phone)===ph)||(nm&&norm(c.name).trim()===nm)) out.push(c);
+  return out;
+}
 function cmDraft(o,i){
   const d={on:true,done:false,name:o.customer_name||'',phone:o.phone||'',address:o.address||'',time:o.delivery_time||'',date:o.date||CM.date,
     mode:o.mode==='lay'?'lay':'giao',note:o.note||'',conf:o.confidence||'medium',issues:o.issues||[],raw:o.raw||'',custId:'',
@@ -789,7 +795,17 @@ function cmDraft(o,i){
   const m=cmMatches(d); if(m.length===1){d.custId=m[0].id; cmFill(d,m[0])}
   return d;
 }
-function cmFill(d,c){ if(!d.phone) d.phone=c.phone||''; if(!d.address) d.address=c.address||'' }
+function cmFill(d,c,force){ if(force||!d.phone) d.phone=c.phone||''; if(force||!d.address) d.address=c.address||'' }
+// Gợi ý khách cũ khi gõ tên/SĐT trong đơn nháp (giống ô gợi ý ở form tạo đơn)
+function cmSuggHtml(d,i){
+  if(d.done||d.custId) return '';
+  const qn=norm(d.name).trim(), qd=digits(d.phone);
+  if(!qn&&qd.length<3) return '';
+  const m=S.customers.filter(c=>(qn&&norm(c.name).includes(qn))||(qd.length>=3&&digits(c.phone).includes(qd))).slice(0,5);
+  return m.map(c=>`<button type="button" data-act="cmt-pick" data-i="${i}" data-id="${c.id}"><b>${esc(c.name)} <i>· ${esc(c.phone||'chưa có SĐT')}</i></b>${c.address?`<span>${esc(c.address)}</span>`:''}</button>`).join('');
+}
+function cmPick(i,id){ const d=CM&&CM.drafts[i], c=S.customers.find(x=>x.id===id); if(!d||d.done||!c) return;
+  d.custId=c.id; d.name=c.name||d.name; cmFill(d,c,true); renderCmt() }
 const cmTotal=d=>d.items.reduce((s,it)=>{const m=cmMenu(it.mid);return s+(m?m.price*it.qty:0)},0);
 function cmMenuOpts(sel){
   const act=S.menu.filter(m=>m.active!==false).sort(byName), used=new Set();
@@ -835,7 +851,7 @@ function renderCmt(){
 }
 const CONF={high:['Rõ ràng','ok'],medium:['Cần xem lại','mid'],low:['Nhiều chỗ chưa chắc','low']};
 function cmCard(d,i){
-  const ms=cmMatches(d), cf=CONF[d.conf]||CONF.medium;
+  const ms=cmChoices(d), cf=CONF[d.conf]||CONF.medium;
   const cust=ms.length?`<div class="field"><label for="cm_c${i}">Khách cũ trùng tên/SĐT</label><select id="cm_c${i}" data-cm="cust" data-i="${i}"><option value="">— Khách mới —</option>${ms.map(c=>`<option value="${c.id}" ${c.id===d.custId?'selected':''}>${esc(c.name)} · ${esc(c.phone||'chưa có SĐT')}${c.address?' · '+esc(c.address.slice(0,30)):''}</option>`).join('')}</select></div>`:'';
   const rows=d.items.map((it,j)=>`<div class="cm-item ${it.mid?'':'bad'}">
       <select data-cm="item-mid" data-i="${i}" data-j="${j}" aria-label="Món">${cmMenuOpts(it.mid)}</select>
@@ -854,6 +870,7 @@ function cmCard(d,i){
       <div class="field"><label for="cm_n${i}">Tên khách</label><input type="text" id="cm_n${i}" data-cm="name" data-i="${i}" value="${esc(d.name)}"></div>
       <div class="field"><label for="cm_p${i}">Số điện thoại</label><input type="tel" id="cm_p${i}" data-cm="phone" data-i="${i}" value="${esc(d.phone)}"></div>
     </div>
+    <div class="sugg" id="cm_s${i}">${cmSuggHtml(d,i)}</div>
     ${cust}
     <div class="field"><label for="cm_a${i}">Địa chỉ giao</label><input type="text" id="cm_a${i}" data-cm="address" data-i="${i}" value="${esc(d.address)}"></div>
     <div class="seg"><button type="button" data-act="cmt-mode" data-i="${i}" data-v="giao" aria-pressed="${d.mode==='giao'}">Giao tận nơi</button><button type="button" data-act="cmt-mode" data-i="${i}" data-v="lay" aria-pressed="${d.mode==='lay'}">Khách ghé lấy</button></div>
@@ -872,16 +889,27 @@ function cmField(t,kind){
   const i=+t.dataset.i, d=CM.drafts[i]; if(!d||d.done) return;
   const k=t.dataset.cm, j=+t.dataset.j;
   if(kind==='input'){
-    if(k==='name'||k==='phone'||k==='address'||k==='note'||k==='time') d[k]=t.value;
+    if(k==='name'||k==='phone'||k==='address'||k==='note'||k==='time'){
+      d[k]=t.value;
+      if((k==='name'||k==='phone')&&d.custId){ const c=S.customers.find(x=>x.id===d.custId); if(!c||(k==='name'?norm(c.name).trim()!==norm(t.value).trim():digits(c.phone)!==digits(t.value))) d.custId='' }
+      if(k==='name'||k==='phone'){ const box=$('#cm_s'+i); if(box) box.innerHTML=cmSuggHtml(d,i) }
+    }
     else if(k==='date'){ if(t.value) d.date=t.value }
     else if(k==='item-note'&&d.items[j]) d.items[j].note=t.value;
     return;
   }
   // change
   if(k==='on'){d.on=t.checked; renderCmt(); return}
-  if(k==='cust'){d.custId=t.value; const c=S.customers.find(x=>x.id===t.value); if(c) cmFill(d,c); renderCmt(); return}
+  if(k==='cust'){d.custId=t.value; const c=S.customers.find(x=>x.id===t.value); if(c) cmFill(d,c,true); renderCmt(); return}
   if(k==='item-mid'&&d.items[j]){d.items[j].mid=t.value; renderCmt(); return}
-  if(k==='name'||k==='phone'){ if(!d.custId&&cmMatches(d).length) renderCmt() }
+  if(k==='name'||k==='phone'){
+    if(!d.custId){
+      // vừa sửa tên -> ưu tiên khách trùng TÊN (SĐT cũ có thể là của người khác); vừa sửa SĐT -> khách trùng SĐT
+      const m=k==='name'?S.customers.filter(c=>norm(c.name).trim()===norm(d.name).trim()&&norm(d.name).trim()):cmMatches(d);
+      if(m.length===1){ d.custId=m[0].id; cmFill(d,m[0],true) }
+      if(m.length||cmChoices(d).length) renderCmt()
+    }
+  }
 }
 function cmtQty(i,j,dl){ const d=CM&&CM.drafts[i], it=d&&d.items[j]; if(!it)return; it.qty=Math.max(1,Math.min(999,it.qty+dl));
   const out=document.querySelectorAll(`[data-card="${i}"] .cm-item`)[j]; if(out){out.querySelector('output').textContent=it.qty; const m=cmMenu(it.mid); out.querySelector('.cm-lp').textContent=m?vnd(m.price*it.qty):''}
@@ -1522,6 +1550,7 @@ document.addEventListener('click',async e=>{
     case 'cmt-save': cmtSave(el); break;
     case 'cmt-back': if(CM){CM.step='in';CM.err='';renderCmt()} break;
     case 'cmt-rmimg': if(CM){cmSync();CM.imgs.splice(+el.dataset.i,1);CM.err='';renderCmt()} break;
+    case 'cmt-pick': cmPick(+el.dataset.i,el.dataset.id); break;
     case 'cmt-mode': {const d=CM&&CM.drafts[+el.dataset.i]; if(d&&!d.done){d.mode=el.dataset.v; renderCmt()} break}
     case 'cmt-qty': cmtQty(+el.dataset.i,+el.dataset.j,+el.dataset.d); break;
     case 'cmt-rmitem': {const d=CM&&CM.drafts[+el.dataset.i]; if(d&&!d.done){d.items.splice(+el.dataset.j,1); renderCmt()} break}
